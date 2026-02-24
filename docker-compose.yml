@@ -24,7 +24,7 @@ services:
     # Default to 3 workers if the user doesn't specify
 
     ports:
-      - "8080:8080"
+      - "4534:8080"
     restart: unless-stopped
     environment:
       # Set your custom API key
