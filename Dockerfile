@@ -23,6 +23,9 @@ WORKDIR /root/
 # Install required tools for yt-dlp to function
 RUN apk add --no-cache ffmpeg python3 yt-dlp
 
+# Set the number of parallel downloads
+ENV MAX_DOWNLOAD_WORKERS=3
+
 # Copy the Pre-built binary file from the previous stage
 COPY --from=builder /app/sidecar .
 

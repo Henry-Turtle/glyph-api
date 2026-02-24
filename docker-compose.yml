@@ -19,17 +19,22 @@ services:
       - "./music:/music:ro" # Navidrome mounts music as read-only by default, but you may need it rw if you want to use the sidecar
 
   sidecar-api:
-    image: ghcr.io/Henry-Turtle/nadadrome:main
-    container_name: nada-api
+    image: ghcr.io/Henry-Turtle/glyph-api:main
+    container_name: glyph-api
+    # Default to 3 workers if the user doesn't specify
+
     ports:
       - "8080:8080"
     restart: unless-stopped
     environment:
       # Set your custom API key
       - API_KEY=my-super-secret-api-key
+      # Maximum concurrent yt-dlp downloads (defaults to 3, max limit 10)
+      - MAX_DOWNLOAD_WORKERS=3
     volumes:
       # Both containers need access to the same music folder so the filepath matches
-      - "./music:/music"
+      # The sidecar must explicitly mount it as Read-Write (:rw) to alter ID3 tags and save downloads
+      - "./music:/music:rw"
 
   watchtower:
     image: containrrr/watchtower

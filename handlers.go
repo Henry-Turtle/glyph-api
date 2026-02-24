@@ -84,8 +84,14 @@ func DownloadTrackHandler(c *gin.Context) {
 		return
 	}
 
-	// Launch download service in the background
-	go services.DownloadTrackAsync(req.Url, req.Quality, req.Title, req.Artist, req.Album)
+	// Queue download task in the background engine
+	services.BackgroundEngine.EnqueueDownload(&services.DownloadTask{
+		Url:     req.Url,
+		Quality: req.Quality,
+		Title:   req.Title,
+		Artist:  req.Artist,
+		Album:   req.Album,
+	})
 
 	c.JSON(http.StatusAccepted, gin.H{
 		"message": "Download task queued in the background",

@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"log"
 	"os"
 	"os/exec"
@@ -8,35 +9,44 @@ import (
 	"strings"
 )
 
-// DownloadTrackAsync runs yt-dlp to fetch the audio, saves it to the /music folder,
+// DownloadTask represents a single background yt-dlp job
+type DownloadTask struct {
+	Url     string
+	Quality string
+	Title   string
+	Artist  string
+	Album   string
+}
+
+// Execute runs yt-dlp to fetch the audio, saves it to the /music folder,
 // and applies the optional metadata using ID3 tags.
-func DownloadTrackAsync(url, quality, title, artist, album string) {
-	log.Printf("Starting async download for: %s", url)
+func (t *DownloadTask) Execute(ctx context.Context) {
+	log.Printf("[LANE:BULK] Starting async download for: %s", t.Url)
 
 	// Determine output directory structure
 	// We'll create a folder structure like: /music/ArtistName/AlbumName/
 	// If artist or album are not provided, we fall back to "Unknown" folders or similar.
 
-	safeArtist := sanitizePath(artist)
+	safeArtist := sanitizePath(t.Artist)
 	if safeArtist == "" {
 		safeArtist = "Unknown Artist"
 	}
 
-	safeAlbum := sanitizePath(album)
+	safeAlbum := sanitizePath(t.Album)
 	if safeAlbum == "" {
 		safeAlbum = "Unknown Album"
 	}
 
 	targetDir := filepath.Join("/music", safeArtist, safeAlbum)
 	if err := os.MkdirAll(targetDir, 0755); err != nil {
-		log.Printf("ERROR: Failed to create target directory %s: %v", targetDir, err)
+		log.Printf("[LANE:BULK] ERROR: Failed to create target directory %s: %v", targetDir, err)
 		return
 	}
 
 	// Map requested quality to a yt-dlp audio quality parameter
 	// 0 is best, 5 is default (~192k), 9 is worst
 	ytQuality := "5" // Default to mid
-	switch quality {
+	switch t.Quality {
 	case "max":
 		ytQuality = "0"
 	case "low":
@@ -48,21 +58,26 @@ func DownloadTrackAsync(url, quality, title, artist, album string) {
 	// We'll use the YouTube video title or ID as the file name, enforcing .mp3 extension.
 	outputTemplate := filepath.Join(targetDir, "%(title)s (%(id)s).%(ext)s")
 
-	log.Printf("Executing yt-dlp into: %s (quality: %s)", targetDir, quality)
+	log.Printf("[LANE:BULK] Executing yt-dlp into: %s (quality: %s)", targetDir, t.Quality)
 
 	// Construct the yt-dlp command
-	cmd := exec.Command("yt-dlp",
+	cmd := exec.CommandContext(ctx, "yt-dlp",
 		"-x", // Extract audio
 		"--audio-format", "mp3",
 		"--audio-quality", ytQuality,
 		"-o", outputTemplate,
-		url,
+		t.Url,
 	)
 
 	// Capture output for debugging
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		log.Printf("ERROR: yt-dlp failed: %v\nOutput: %s", err, string(output))
+		// Differentiate between intentional context cancellation and random failures
+		if ctx.Err() != nil {
+			log.Printf("[LANE:BULK] WARN: yt-dlp cancelled during system shutdown: %v", ctx.Err())
+			return
+		}
+		log.Printf("[LANE:BULK] ERROR: yt-dlp failed: %v\nOutput: %s", err, string(output))
 		return
 	}
 
@@ -76,24 +91,24 @@ func DownloadTrackAsync(url, quality, title, artist, album string) {
 	// "Destination: /music/Artist/Album/VideoTitle (ID).mp3"
 	downloadedFile := extractFilenameFromYTDLPOutput(string(output))
 	if downloadedFile == "" {
-		log.Printf("ERROR: yt-dlp succeeded but could not determine final output filepath from logs.")
+		log.Printf("[LANE:BULK] ERROR: yt-dlp succeeded but could not determine final output filepath from logs.")
 		return
 	}
 
-	log.Printf("Successfully downloaded file: %s", downloadedFile)
+	log.Printf("[LANE:BULK] Successfully downloaded file: %s", downloadedFile)
 
 	// Finally, apply the requested metadata using our existing engine room logic
-	if title != "" || artist != "" || album != "" {
-		log.Printf("Applying metadata tags to %s...", downloadedFile)
-		err = UpdateTrackMetadataExpanded(downloadedFile, title, artist, album)
+	if t.Title != "" || t.Artist != "" || t.Album != "" {
+		log.Printf("[LANE:BULK] Applying metadata tags to %s...", downloadedFile)
+		err = UpdateTrackMetadataExpanded(downloadedFile, t.Title, t.Artist, t.Album)
 		if err != nil {
-			log.Printf("ERROR: Failed to apply ID3 tags to new file %s: %v", downloadedFile, err)
+			log.Printf("[LANE:BULK] ERROR: Failed to apply ID3 tags to new file %s: %v", downloadedFile, err)
 			return
 		}
-		log.Printf("Successfully applied metadata tags to %s", downloadedFile)
+		log.Printf("[LANE:BULK] Successfully applied metadata tags to %s", downloadedFile)
 	}
 
-	log.Printf("Finished async job for %s", url)
+	log.Printf("[LANE:BULK] Finished async job for %s", t.Url)
 }
 
 // sanitizePath helps prevent directory traversal or invalid characters in path creation
