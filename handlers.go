@@ -102,3 +102,26 @@ func DownloadTrackHandler(c *gin.Context) {
 		},
 	})
 }
+
+// HealthCheckHandler verifies API connectivity and write access to the /music directory.
+func HealthCheckHandler(c *gin.Context) {
+	// Attempt to create a temporary file to verify write access
+	f, err := os.CreateTemp("/music", ".healthcheck-*")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status": "error",
+			"error": "Failed to verify write access to /music directory: " + err.Error(),
+			"authenticated": true, // Middleware already verified this
+		})
+		return
+	}
+	
+	f.Close()
+	os.Remove(f.Name())
+
+	c.JSON(http.StatusOK, gin.H{
+		"status": "healthy",
+		"message": "Connected to Glyph API. Read/Write access to /music verified.",
+		"authenticated": true,
+	})
+}

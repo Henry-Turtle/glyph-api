@@ -23,6 +23,7 @@ func main() {
 	// 2. Setup Gin Router
 	r := gin.Default()
 	r.Use(AuthMiddleware())
+	r.GET("/health", HealthCheckHandler)
 	r.POST("/update-track", UpdateTrackHandler)
 	r.POST("/download-track", DownloadTrackHandler)
 
