@@ -14,11 +14,15 @@ import (
 // ResolveSongPathByID connects strictly Read-Only to Navidrome's SQLite file
 // to securely resolve a Subsonic API ID into its absolute container file path.
 func ResolveSongPathByID(songID string) (string, error) {
-	dbPath := "/data/navidrome.db"
+	dataDir := os.Getenv("DATA_DIR")
+	if dataDir == "" {
+		dataDir = "/data"
+	}
+	dbPath := filepath.Join(dataDir, "navidrome.db")
 
 	// Verify the database file physically exists in the container
 	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
-		return "", errors.New("navidrome database not found at /data/navidrome.db (please ensure you mounted the /data volume natively)")
+		return "", fmt.Errorf("navidrome database not found at %s (please ensure you mounted the data volume natively)", dbPath)
 	}
 
 	// URI formatting forces modernc.org/sqlite to not take exclusive locks
