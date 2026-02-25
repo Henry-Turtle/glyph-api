@@ -31,6 +31,8 @@ services:
       - API_KEY=my-super-secret-api-key
       # Maximum concurrent yt-dlp downloads (defaults to 3, max limit 10)
       - MAX_DOWNLOAD_WORKERS=3
+      # If you have a custom directory inside the container not mapped to "/music", activate this line:
+      # - MUSIC_DIR=/my_custom_vault
     volumes:
       # Navidrome's database must be strictly mounted as Read-Only to securely resolve Subsonic IDs
       - "./data:/data:ro"

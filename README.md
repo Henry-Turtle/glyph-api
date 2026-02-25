@@ -60,6 +60,8 @@ If you already have Navidrome running via Docker Compose, you can add Glyph API 
        environment:
          - API_KEY=replace-with-your-key # Choose a strong password
          - MAX_DOWNLOAD_WORKERS=3
+         # If you have a custom directory inside the container not mapped to "/music", activate this line:
+         # - MUSIC_DIR=/my_custom_vault
        volumes:
          # REQUIRED: Mount Navidrome's database read-only so Glyph can securely resolve Subsonic IDs
          - "/path/to/your/navidrome/data:/data:ro"

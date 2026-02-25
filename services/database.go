@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 
 	_ "modernc.org/sqlite"
 )
@@ -37,6 +39,16 @@ func ResolveSongPathByID(songID string) (string, error) {
 			return "", errors.New("no song found matching that exact Subsonic ID in the database")
 		}
 		return "", fmt.Errorf("failed scanning database row: %v", err)
+	}
+
+	// Navidrome stores paths relative to its internal MusicFolder.
+	// We use MUSIC_DIR (defaulting to /music) to accurately construct the internal absolute path!
+	if !strings.HasPrefix(absPath, "/") {
+		musicDir := os.Getenv("MUSIC_DIR")
+		if musicDir == "" {
+			musicDir = "/music"
+		}
+		absPath = filepath.Join(musicDir, absPath)
 	}
 
 	return absPath, nil
