@@ -32,9 +32,9 @@ func AuthMiddleware() gin.HandlerFunc {
 
 // UpdateTrackRequest represents the expected JSON body for the /update-track endpoint.
 type UpdateTrackRequest struct {
-	FilePath string `json:"file_path" binding:"required"`
-	Title    string `json:"title" binding:"required"`
-	Artist   string `json:"artist" binding:"required"`
+	Id     string `json:"id" binding:"required"`
+	Title  string `json:"title" binding:"required"`
+	Artist string `json:"artist" binding:"required"`
 }
 
 // UpdateTrackHandler processes the track update request.
@@ -45,14 +45,21 @@ func UpdateTrackHandler(c *gin.Context) {
 		return
 	}
 
-	// Verify the file exists before passing to the engine room
-	if _, err := os.Stat(req.FilePath); os.IsNotExist(err) {
-		c.JSON(http.StatusNotFound, gin.H{"error": "File not found: " + req.FilePath})
+	// 1. Resolve the Subsonic ID to an absolute physical file path by querying the DB
+	absPath, err := services.ResolveSongPathByID(req.Id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Failed to resolve Song ID to physical file: " + err.Error()})
 		return
 	}
 
-	// Invoke the service to perform the metadata update
-	if err := services.UpdateTrackMetadata(req.FilePath, req.Title, req.Artist); err != nil {
+	// 2. Verify the resolved file physically exists before passing to the engine room
+	if _, err := os.Stat(absPath); os.IsNotExist(err) {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database returned path but physical file is missing from Navidrome mount: " + absPath})
+		return
+	}
+
+	// 3. Invoke the service to perform the metadata update using the resolved physical path
+	if err := services.UpdateTrackMetadata(absPath, req.Title, req.Artist); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update metadata: " + err.Error()})
 		return
 	}
@@ -60,7 +67,8 @@ func UpdateTrackHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Metadata updated successfully",
 		"track": gin.H{
-			"file_path": req.FilePath,
+			"id":        req.Id,
+			"file_path": absPath,
 			"title":     req.Title,
 			"artist":    req.Artist,
 		},
@@ -109,19 +117,19 @@ func HealthCheckHandler(c *gin.Context) {
 	f, err := os.CreateTemp("/music", ".healthcheck-*")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"status": "error",
-			"error": "Failed to verify write access to /music directory: " + err.Error(),
+			"status":        "error",
+			"error":         "Failed to verify write access to /music directory: " + err.Error(),
 			"authenticated": true, // Middleware already verified this
 		})
 		return
 	}
-	
+
 	f.Close()
 	os.Remove(f.Name())
 
 	c.JSON(http.StatusOK, gin.H{
-		"status": "healthy",
-		"message": "Connected to Glyph API. Read/Write access to /music verified.",
+		"status":        "healthy",
+		"message":       "Connected to Glyph API. Read/Write access to /music verified.",
 		"authenticated": true,
 	})
 }

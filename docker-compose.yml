@@ -32,8 +32,9 @@ services:
       # Maximum concurrent yt-dlp downloads (defaults to 3, max limit 10)
       - MAX_DOWNLOAD_WORKERS=3
     volumes:
-      # Both containers need access to the same music folder so the filepath matches
-      # The sidecar must explicitly mount it as Read-Write (:rw) to alter ID3 tags and save downloads
+      # Navidrome's database must be strictly mounted as Read-Only to securely resolve Subsonic IDs
+      - "./data:/data:ro"
+      # The sidecar explicitly mounts music as Read-Write to physically alter ID3 tags and save downloads
       - "./music:/music:rw"
 
   watchtower:

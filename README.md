@@ -61,6 +61,8 @@ If you already have Navidrome running via Docker Compose, you can add Glyph API 
          - API_KEY=replace-with-your-key # Choose a strong password
          - MAX_DOWNLOAD_WORKERS=3
        volumes:
+         # REQUIRED: Mount Navidrome's database read-only so Glyph can securely resolve Subsonic IDs
+         - "/path/to/your/navidrome/data:/data:ro"
          # IMPORTANT: This absolute path on the left MUST perfectly match Navidrome's!
          - "/path/to/your/music/folder:/music:rw"
    ```
@@ -87,13 +89,15 @@ docker compose up -d
 All requests must include your secure password in the `X-API-KEY` header.
 
 ### 1. Update Existing Track Metadata
-Use the `/update-track` endpoint to write ID3 tags. The `file_path` in the payload must be the absolute container path that Navidrome uses (e.g., `/music/Path/To/Track.mp3`).
+Use the `/update-track` endpoint to instantly rewrite specific ID3 tags. Instead of providing fragile physical paths, simply send the EXACT `id` provided by the Navidrome/Subsonic API (e.g., `id: "6d84bd86287c8d9c5b"`).
+
+The Sidecar safely connects to the local Navidrome SQLite database, resolves your `id` directly to its internal absolute filepath, and applies the physical edits.
 
 ```bash
 curl -X POST http://localhost:8080/update-track \
   -H "X-API-KEY: my-super-secret-api-key" \
   -H "Content-Type: application/json" \
-  -d '{"file_path": "/music/Path/To/Track.mp3", "title": "New Title", "artist": "New Artist"}'
+  -d '{"id": "6d84bd86287c8d9c5b", "title": "New Title", "artist": "New Artist"}'
 ```
 
 ### 2. Download New Track from YouTube
