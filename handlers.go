@@ -33,8 +33,9 @@ func AuthMiddleware() gin.HandlerFunc {
 // UpdateTrackRequest represents the expected JSON body for the /update-track endpoint.
 type UpdateTrackRequest struct {
 	Id     string `json:"id" binding:"required"`
-	Title  string `json:"title" binding:"required"`
-	Artist string `json:"artist" binding:"required"`
+	Title  string `json:"title"`
+	Artist string `json:"artist"`
+	Album  string `json:"album"`
 }
 
 // UpdateTrackHandler processes the track update request.
@@ -59,7 +60,7 @@ func UpdateTrackHandler(c *gin.Context) {
 	}
 
 	// 3. Invoke the service to perform the metadata update using the resolved physical path
-	if err := services.UpdateTrackMetadata(absPath, req.Title, req.Artist); err != nil {
+	if err := services.UpdateTrackMetadataExpanded(absPath, req.Title, req.Artist, req.Album); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update metadata: " + err.Error()})
 		return
 	}
@@ -71,6 +72,7 @@ func UpdateTrackHandler(c *gin.Context) {
 			"file_path": absPath,
 			"title":     req.Title,
 			"artist":    req.Artist,
+			"album":     req.Album,
 		},
 	})
 }
