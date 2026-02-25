@@ -1,4 +1,6 @@
-FROM golang:1.24-alpine AS builder
+# Pin the builder exclusively to the platform executing the build (e.g. GitHub Actions amd64)
+# to completely bypass QEMU software CPU emulation for the Go compiler itself.
+FROM --platform=$BUILDPLATFORM golang:1.24-alpine AS builder
 
 WORKDIR /app
 
@@ -11,9 +13,14 @@ RUN go mod download
 # Copy the source code
 COPY . .
 
+# Dynamically receive the target platform (e.g. linux/arm64) from Docker Buildx
+ARG TARGETOS
+ARG TARGETARCH
+
 # Build the Go app
 # CGO_ENABLED=0 ensures a static binary, good for minimal containers
-RUN CGO_ENABLED=0 GOOS=linux go build -o sidecar .
+# We inject TARGETOS and TARGETARCH natively into the insanely fast Go cross-compiler
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o sidecar .
 
 # Start a new, smaller stage
 FROM alpine:latest  
