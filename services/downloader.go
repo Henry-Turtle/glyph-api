@@ -29,17 +29,24 @@ func (t *DownloadTask) Execute(ctx context.Context) {
 
 	safeArtist := sanitizePath(t.Artist)
 	if safeArtist == "" {
-		safeArtist = "Unknown Artist"
+		safeArtist = "%(artist,creator,uploader|Unknown Artist)s"
 	}
 
 	safeAlbum := sanitizePath(t.Album)
 	if safeAlbum == "" {
-		safeAlbum = "Unknown Album"
+		safeAlbum = "%(album|Unknown Album)s"
+	}
+
+	safeTitle := sanitizePath(t.Title)
+	if safeTitle == "" {
+		safeTitle = "%(title)s (%(id)s)"
 	}
 
 	targetDir := filepath.Join("/music", safeArtist, safeAlbum)
-	if err := os.MkdirAll(targetDir, 0755); err != nil {
-		log.Printf("[LANE:BULK] ERROR: Failed to create target directory %s: %v", targetDir, err)
+	// We no longer pre-create targetDir via os.MkdirAll here because it might contain yt-dlp template variables
+	// like %(artist)s. yt-dlp will automatically create necessary intermediate directories!
+	if err := os.MkdirAll("/music", 0755); err != nil {
+		log.Printf("[LANE:BULK] ERROR: Failed to create base music directory: %v", err)
 		return
 	}
 
@@ -56,7 +63,7 @@ func (t *DownloadTask) Execute(ctx context.Context) {
 	// We don't know the exact filename until yt-dlp finishes downloading.
 	// yt-dlp's `-o` template will define it.
 	// We'll use the YouTube video title or ID as the file name, enforcing .mp3 extension.
-	outputTemplate := filepath.Join(targetDir, "%(title)s (%(id)s).%(ext)s")
+	outputTemplate := filepath.Join(targetDir, safeTitle+".%(ext)s")
 
 	log.Printf("[LANE:BULK] Executing yt-dlp into: %s (quality: %s)", targetDir, t.Quality)
 
@@ -65,6 +72,8 @@ func (t *DownloadTask) Execute(ctx context.Context) {
 		"-x", // Extract audio
 		"--audio-format", "mp3",
 		"--audio-quality", ytQuality,
+		"--embed-metadata",
+		"--embed-thumbnail",
 		"-o", outputTemplate,
 		t.Url,
 	)

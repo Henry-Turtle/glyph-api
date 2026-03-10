@@ -26,7 +26,7 @@ var BackgroundEngine *Engine
 func StartEngine(ctx context.Context) {
 	BackgroundEngine = &Engine{
 		// Buffered channel to queue downloads
-		downloadChan: make(chan Task, 1000), 
+		downloadChan: make(chan Task, 1000),
 	}
 
 	// Determine pool size for yt-dlp
@@ -57,7 +57,7 @@ func StartEngine(ctx context.Context) {
 // workerLane pulls jobs off the channel until the channel closes or context cancels.
 func (e *Engine) workerLane(ctx context.Context, id int) {
 	defer e.wg.Done()
-	
+
 	for {
 		select {
 		case <-ctx.Done():
