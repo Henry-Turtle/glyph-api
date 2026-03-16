@@ -18,9 +18,10 @@ services:
       - "./data:/data"
       - "./music:/music:ro" # Navidrome mounts music as read-only by default, but you may need it rw if you want to use the sidecar
 
-  sidecar-api:
+  glyph-api:
     image: ghcr.io/Henry-Turtle/glyph-api:main
     container_name: glyph-api
+    user: 1000:1000
     # Default to 3 workers if the user doesn't specify
 
     ports:

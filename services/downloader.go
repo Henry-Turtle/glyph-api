@@ -63,7 +63,9 @@ func (t *DownloadTask) Execute(ctx context.Context) {
 	// We don't know the exact filename until yt-dlp finishes downloading.
 	// yt-dlp's `-o` template will define it.
 	// We'll use the YouTube video title or ID as the file name, enforcing .mp3 extension.
-	outputTemplate := filepath.Join(targetDir, safeTitle+".%(ext)s")
+	// To prevent Navidrome from scanning the file before we have finished applying our
+	// custom ID3 tags, we prefix the filename with ".glyph-" to hide it.
+	outputTemplate := filepath.Join(targetDir, ".glyph-"+safeTitle+".%(ext)s")
 
 	log.Printf("[LANE:BULK] Executing yt-dlp into: %s (quality: %s)", targetDir, t.Quality)
 
@@ -104,7 +106,7 @@ func (t *DownloadTask) Execute(ctx context.Context) {
 		return
 	}
 
-	log.Printf("[LANE:BULK] Successfully downloaded file: %s", downloadedFile)
+	log.Printf("[LANE:BULK] Successfully downloaded hidden file: %s", downloadedFile)
 
 	// Finally, apply the requested metadata using our existing engine room logic
 	if t.Title != "" || t.Artist != "" || t.Album != "" {
@@ -117,7 +119,21 @@ func (t *DownloadTask) Execute(ctx context.Context) {
 		log.Printf("[LANE:BULK] Successfully applied metadata tags to %s", downloadedFile)
 	}
 
-	log.Printf("[LANE:BULK] Finished async job for %s", t.Url)
+	// Always ensure the album fallback is applied if yt-dlp or the user left it blank
+	err = EnsureAlbumFallback(downloadedFile)
+	if err != nil {
+		log.Printf("[LANE:BULK] WARN: Failed to ensure secondary album fallback for %s: %v", downloadedFile, err)
+	}
+
+	// Now that the file is perfectly tagged, rename it to remove the hidden prefix so Navidrome can scan it natively
+	finalBaseName := strings.TrimPrefix(filepath.Base(downloadedFile), ".glyph-")
+	finalPath := filepath.Join(filepath.Dir(downloadedFile), finalBaseName)
+	if err := os.Rename(downloadedFile, finalPath); err != nil {
+		log.Printf("[LANE:BULK] ERROR: Failed to publish file to %s: %v", finalPath, err)
+		return
+	}
+
+	log.Printf("[LANE:BULK] Finished async job. Final file published to %s", finalPath)
 }
 
 // sanitizePath helps prevent directory traversal or invalid characters in path creation

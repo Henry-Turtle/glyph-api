@@ -45,3 +45,28 @@ func UpdateTrackMetadataExpanded(filePath, title, artist, album string) error {
 
 	return nil
 }
+
+// EnsureAlbumFallback checks if the file has an empty Album tag.
+// If it does, but it has an Artist tag, it falls back to using the Artist as the Album.
+func EnsureAlbumFallback(filePath string) error {
+	editMutex.Lock()
+	defer editMutex.Unlock()
+
+	tag, err := id3v2.Open(filePath, id3v2.Options{Parse: true})
+	if err != nil {
+		return fmt.Errorf("failed to open file as id3v2 tag: %w", err)
+	}
+	defer tag.Close()
+
+	album := tag.Album()
+	artist := tag.Artist()
+
+	if (album == "" || album == "Unknown Album" || album == "[Unknown Album]") && artist != "" {
+		tag.SetAlbum(artist)
+		if err := tag.Save(); err != nil {
+			return fmt.Errorf("failed to save fallback album tag: %w", err)
+		}
+	}
+
+	return nil
+}
